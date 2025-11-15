@@ -13,3 +13,9 @@ members = ["plugins/chat"]
 
 [workspace.dependencies]
 kovi = "0.12"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
