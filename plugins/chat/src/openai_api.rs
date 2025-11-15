@@ -88,7 +88,7 @@ impl OpenaiClient {
         let client = Arc::new(match proxy {
             None => builder.build().expect("Failed to build reqwest client"),
             Some(v) => builder
-                .proxy(Proxy::http(v).expect("Failed to connect to proxy"))
+                .proxy(Proxy::all(v).expect("Failed to connect to proxy"))
                 .build()
                 .expect("Failed to build reqwest client"),
         });
