@@ -1208,11 +1208,9 @@ dependencies = [
 name = "ros-bot"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "chat",
  "kovi",
  "kovi-plugin-cmd",
- "tokio",
 ]
 
 [[package]]
