@@ -1,5 +1,6 @@
 use anyhow::Error;
 use kovi::log::info;
+use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -63,7 +64,7 @@ pub struct OpenaiClient {
     model: String,
     system_promote: String,
     temperature: Option<f32>,
-    max_tokens: Option<u32>,
+    max_output_tokens: Option<u32>,
     http_client: Arc<reqwest::Client>,
 }
 
@@ -74,18 +75,23 @@ impl OpenaiClient {
         model: String,
         promote: String,
         temperature: Option<f32>,
-        max_tokens: Option<u32>,
+        max_output_tokens: Option<u32>,
+        proxy: Option<String>,
     ) -> Self {
-        let client = Arc::new(
-            reqwest::Client::builder()
-                .pool_max_idle_per_host(20)
-                .pool_idle_timeout(Duration::from_secs(90))
-                .timeout(Duration::from_secs(15))
-                .connect_timeout(Duration::from_secs(5))
-                .tcp_nodelay(true)
+        let builder = reqwest::Client::builder()
+            .pool_max_idle_per_host(20)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .timeout(Duration::from_secs(15))
+            .connect_timeout(Duration::from_secs(5))
+            .tcp_nodelay(true);
+
+        let client = Arc::new(match proxy {
+            None => builder.build().expect("Failed to build reqwest client"),
+            Some(v) => builder
+                .proxy(Proxy::http(v).expect("Failed to connect to proxy"))
                 .build()
                 .expect("Failed to build reqwest client"),
-        );
+        });
 
         OpenaiClient {
             api_url: api,
@@ -93,7 +99,7 @@ impl OpenaiClient {
             model,
             system_promote: promote,
             temperature,
-            max_tokens,
+            max_output_tokens,
             http_client: client,
         }
     }
@@ -123,7 +129,7 @@ impl OpenaiClient {
             model: self.model.clone(),
             messages: messages.clone(),
             temperature: self.temperature,
-            max_tokens: self.max_tokens,
+            max_tokens: self.max_output_tokens,
         };
 
         // 发送请求

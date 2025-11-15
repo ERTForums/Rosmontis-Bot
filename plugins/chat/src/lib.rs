@@ -9,8 +9,8 @@ use crate::config::Config;
 use crate::message::OneBotMessage;
 use crate::openai_api::{ChatRole, Message, OpenaiClient};
 use crate::user_manager::UserManager;
-use kovi::PluginBuilder as plugin;
 use kovi::log::{error, info};
+use kovi::PluginBuilder as plugin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -27,7 +27,8 @@ async fn main() {
             config.model,
             config.system_promote,
             config.temperature,
-            config.max_tokens,
+            config.max_output_tokens,
+            config.proxy,
         )
         .await,
     );
