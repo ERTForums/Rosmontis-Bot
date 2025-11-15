@@ -1,5 +1,5 @@
 use anyhow::Error;
-use kovi::log::info;
+use kovi::log::{error, info};
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -140,11 +140,21 @@ impl OpenaiClient {
             .json(&request)
             .send()
             .await?
-            .json::<ChatResponse>()
+            .text()
             .await?;
 
+        // 如果反序列化失败直接输出
+        let json = match serde_json::from_str::<ChatResponse>(response.as_str()) {
+            Ok(v) => v,
+            Err(e) => {
+                error!("Failed to parse json:");
+                eprintln!("{:?}", response);
+                return Err(Error::msg(e));
+            }
+        };
+
         // 返回
-        Ok(response)
+        Ok(json)
     }
 
     pub async fn chat(&self, messages: &mut Vec<Message>) -> Result<String, Error> {
