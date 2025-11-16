@@ -1,6 +1,6 @@
 use crate::user_manager::User;
-use kovi::log::info;
 use kovi::Message as KoviMsg;
+use kovi::log::info;
 use serde_json::Value;
 use std::collections::HashMap;
 
