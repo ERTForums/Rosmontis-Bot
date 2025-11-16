@@ -12,23 +12,15 @@ pub struct Config {
     pub(crate) system_promote: String,
     pub(crate) temperature: Option<f32>,
     pub(crate) max_output_tokens: Option<u32>,
-    pub(crate) user_repository: PathBuf,
 }
 
 impl Config {
-    pub fn from_file() -> Self {
-        let path = std::env::current_dir()
-            .expect("Failed to get current directory")
-            .join("config.toml");
+    pub fn from_file(path: PathBuf) -> Self {
         if !path.is_file() {
             error!("Config is not exist");
             info!("Create new config: {}", path.display());
             let config = Config::default();
-            save_toml_data(
-                &kovi::toml::to_string(&config).expect("Failed to write new config"),
-                path,
-            )
-            .expect("Failed to write new config");
+            save_toml_data(&config, path).expect("Failed to write new config");
             panic!()
         }
         load_toml_data(Config::default(), path).expect("Fail to load config")
@@ -45,7 +37,6 @@ impl Default for Config {
             system_promote: "System Promote".to_string(),
             temperature: None,
             max_output_tokens: None,
-            user_repository: PathBuf::from("user.json"),
         }
     }
 }
