@@ -1,5 +1,6 @@
 use crate::user_manager::User;
 use kovi::log::info;
+use serde_json::Value;
 use std::collections::HashMap;
 
 /// 命令 Trait
@@ -14,6 +15,7 @@ pub trait Command: Send + Sync {
     fn execute(
         &self,
         msg: &str,
+        raw_msg: &Value,
         user: &mut User,
         registry: &CommandRegistry,
         reply: &mut dyn FnMut(&str),
@@ -39,9 +41,15 @@ impl CommandRegistry {
     }
 
     /// 处理消息，返回 true 表示命令已处理，不再 AI 回复
-    pub fn handle(&self, msg: &str, user: &mut User, reply: &mut dyn FnMut(&str)) -> bool {
+    pub fn handle(
+        &self,
+        msg: &str,
+        raw_msg: &Value,
+        user: &mut User,
+        reply: &mut dyn FnMut(&str),
+    ) -> bool {
         for cmd in self.commands.values() {
-            if cmd.execute(msg, user, self, reply) {
+            if cmd.execute(msg, raw_msg, user, self, reply) {
                 return true;
             }
         }
@@ -74,6 +82,7 @@ impl Command for HelpCommand {
     fn execute(
         &self,
         msg: &str,
+        _raw: &Value,
         _user: &mut User,
         registry: &CommandRegistry,
         reply: &mut dyn FnMut(&str),
@@ -106,6 +115,7 @@ impl Command for ClearCommand {
     fn execute(
         &self,
         msg: &str,
+        _raw: &Value,
         user: &mut User,
         _registry: &CommandRegistry,
         reply: &mut dyn FnMut(&str),

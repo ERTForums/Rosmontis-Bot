@@ -100,7 +100,9 @@ async fn main() {
                     let mut user = user_manager.load_user(event.sender.user_id).await?;
 
                     // 处理指令
-                    if commands.handle(text, &mut user, &mut |x| event.reply(x)) {
+                    if commands.handle(text, &event.original_json, &mut user, &mut |x| {
+                        event.reply(x)
+                    }) {
                         return Ok(());
                     }
 
