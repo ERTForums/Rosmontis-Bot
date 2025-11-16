@@ -1,6 +1,6 @@
 # Rosmontis-Bot
 
-基于 Kovi 写一个 QQ 机器人
+基于 Kovi 写一个 QQ 机器人 ( ERT 自用机器人)
 
 ## Todo:
 
@@ -8,13 +8,13 @@
 
 - [x] 用户数据库
 
-- [ ] MCP 加载器
+- [x] MCP 加载器
 
 - [ ] 基本的命令功能
 
 - [ ] ...
 
-## 部署方法
+## 部署文档
 
 * 前往 [Github Action](https://github.com/ERTForums/Rosmontis-Bot/actions) 下载二进制文件并运行
 
@@ -164,4 +164,117 @@ max_output_token = 100
 可以提及技能、战术，但要贴近干员能力描述
 
 在谈论过去或实验时带有孩子视角，但能理解责任与战斗意义
+```
+
+## 开发文档
+
+目前本项目的开发都在 `chat` 插件内，请在`plugins/chat` 内进行开发，提供以下接口
+
+若需要其他接口，请提交 Issue 或联系开发者
+
+### 注册命令
+
+参考以下示例在 `function_register` 模块内添加命令
+
+* `function_register/your_command.rs`
+
+```
+use crate::commands::*;
+
+/// 创建命令结构体
+pub struct ClearCommand;
+
+impl Command for ClearCommand {
+    /// 命令名称
+    fn name(&self) -> &'static str {
+        "clear"
+    }
+    /// 命令描述
+    fn description(&self) -> &'static str {
+        "清空用户历史记录"
+    }
+    /// 执行命令
+    fn execute(
+        &self,
+        msg: &str,
+        user: &mut User,
+        _registry: &CommandRegistry,
+        reply: &mut dyn FnMut(&str),
+    ) -> bool {
+        // 匹配命令则返回 true (返回为 true 时不进行 AI 回复)
+        if msg.trim() == "clear" {
+            user.history.clear();
+            info!("User {} cleared history", user.id);
+            reply("历史记录已清理");
+            true
+        } else {
+            false
+        }
+    }
+}
+```
+
+* `function_register/mod.rs`
+
+```
+pub fn register_commands(commands_reg: &mut CommandRegistry) {
+    // 注册自定义命令
+    use your_command;
+    commands_reg.register(your_command::ClearCommand);
+}
+```
+
+### 注册 MCP 功能
+
+参考以下示例在 `function_register` 模块内添加 MCP
+
+* `function_register/your_mcp.rs`
+
+```
+use crate::mcp_loader::*;
+use serde_json::json;
+
+/// 创建 MCP 结构体
+struct SumMCP;
+
+impl MCP for SumMCP {
+    /// MCP 名称
+    fn name(&self) -> &'static str {
+        "calculate_sum"
+    }
+
+    /// MCP 描述
+    fn description(&self) -> &'static str {
+        "计算两个整数的和"
+    }
+
+    /// MCP 参数
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+                "type": "object",
+                "properties": {
+                    "a": { "type": "integer" },
+                    "b": { "type": "integer" }
+                },
+                "required": ["a", "b"]
+            })
+    }
+
+    /// MCP 执行函数
+    fn execute(&self, args: serde_json::Value) -> serde_json::Value {
+        let a = args.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
+        let b = args.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
+        json!({ "result": a + b })
+    }
+}
+```
+
+* `function_register/mod.rs`
+
+```
+pub fn register_commands(commands_reg: &mut CommandRegistry) {
+    // 注册自定义 MCP
+    use your_mcp;
+    commands_reg.register(your_mcp::SumMCP);
+}
 ```
