@@ -1,5 +1,6 @@
 use crate::user_manager::User;
 use kovi::log::info;
+use kovi::Message as KoviMsg;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -18,7 +19,7 @@ pub trait Command: Send + Sync {
         raw_msg: &Value,
         user: &mut User,
         registry: &CommandRegistry,
-        reply: &mut dyn FnMut(&str),
+        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool;
 }
 
@@ -46,7 +47,7 @@ impl CommandRegistry {
         msg: &str,
         raw_msg: &Value,
         user: &mut User,
-        reply: &mut dyn FnMut(&str),
+        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool {
         for cmd in self.commands.values() {
             if cmd.execute(msg, raw_msg, user, self, reply) {
@@ -85,7 +86,7 @@ impl Command for HelpCommand {
         _raw: &Value,
         _user: &mut User,
         registry: &CommandRegistry,
-        reply: &mut dyn FnMut(&str),
+        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool {
         if msg.trim() == "help" {
             let commands = registry.list_commands();
@@ -93,7 +94,8 @@ impl Command for HelpCommand {
             for (name, desc) in commands {
                 output.push_str(&format!("{}: {}\n", name, desc));
             }
-            reply(&output);
+            let msg = KoviMsg::from(&output);
+            reply(msg);
             true
         } else {
             false
@@ -118,12 +120,13 @@ impl Command for ClearCommand {
         _raw: &Value,
         user: &mut User,
         _registry: &CommandRegistry,
-        reply: &mut dyn FnMut(&str),
+        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool {
         if msg.trim() == "clear" {
             user.history.clear();
             info!("User {} cleared history", user.id);
-            reply("历史记录已清理");
+            let msg = KoviMsg::from("历史记录已清理");
+            reply(msg);
             true
         } else {
             false

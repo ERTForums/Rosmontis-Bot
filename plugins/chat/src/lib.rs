@@ -11,11 +11,11 @@ use crate::config::Config;
 use crate::function_register::{register_commands, register_mcp};
 use crate::mcp_loader::MCPRegistry;
 use crate::message::OneBotMessage;
-use crate::openai_api::{ChatRole, Message, OpenaiClient};
+use crate::openai_api::{ChatRole, Message as OpenaiMsg, OpenaiClient};
 use crate::user_manager::UserManager;
 use anyhow::Error;
 use kovi::log::{error, info};
-use kovi::{PluginBuilder as plugin, PluginBuilder};
+use kovi::{Message as KoviMsg, PluginBuilder as plugin, PluginBuilder};
 use std::sync::Arc;
 
 #[kovi::plugin]
@@ -100,14 +100,14 @@ async fn main() {
                     let mut user = user_manager.load_user(event.sender.user_id).await?;
 
                     // 处理指令
-                    if commands.handle(text, &event.original_json, &mut user, &mut |x| {
+                    if commands.handle(text, &event.original_json, &mut user, &mut |x: KoviMsg| {
                         event.reply(x)
                     }) {
                         return Ok(());
                     }
 
                     // 构造消息列表
-                    user.history.push(Message {
+                    user.history.push(OpenaiMsg {
                         role: ChatRole::User,
                         content: text.to_string(),
                         name: None,
