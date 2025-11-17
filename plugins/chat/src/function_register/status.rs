@@ -38,7 +38,7 @@ impl Command for StatusCommand {
     }
 }
 
-pub fn server_status() -> String {
+fn server_status() -> String {
     let mut sys = System::new_all();
     sys.refresh_all();
 

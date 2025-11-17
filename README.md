@@ -8,7 +8,7 @@
 
 - [x] 用户数据库
 
-- [x] MCP 加载器
+- [ ] MCP 加载器(似乎无法完成了，暂时放弃)
 
 - [ ] 基本的命令功能
 
@@ -240,7 +240,7 @@ use crate::mcp_loader::*;
 use serde_json::json;
 
 /// 创建 MCP 结构体
-struct SumMCP;
+pub struct SumMCP;
 
 impl MCP for SumMCP {
     /// MCP 名称

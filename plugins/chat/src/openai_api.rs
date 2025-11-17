@@ -8,20 +8,28 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// 最大 MCP 循环次数
-const MAX_MCP_LOOP: usize = 5;
+const MAX_MCP_LOOP: u8 = 5;
 
 #[derive(Debug, Serialize)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
-    /// MCP functions
-    pub functions: Vec<FunctionDef>,
-    /// MCP function_call
-    pub function_call: Vec<FunctionCall>,
+    // MCP functions
+    // pub functions: Vec<FunctionDef>,
+    // MCP function_call
+    // pub function_call: String,
+    // OpenRouter MCP
+    // pub tools: Vec<OpenRouterTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenRouterTool {
+    tool_type: String,
+    function: FunctionDef,
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,13 +125,22 @@ impl OpenaiClient {
     async fn request(
         &self,
         messages: &Vec<Message>,
-        mcp_registry: &MCPRegistry,
+        _mcp_registry: &MCPRegistry,
     ) -> Result<ChatResponse, Error> {
         let request = ChatRequest {
             model: self.model.clone(),
             messages: messages.clone(),
-            functions: mcp_registry.functions(),
-            function_call: mcp_registry.function_calls(),
+            // functions: mcp_registry.functions(),
+            // function_call: "auto".to_string(),
+            /* tools: mcp_registry
+                .functions()
+                .into_iter()
+                .map(|x| OpenRouterTool {
+                    tool_type: "function".to_string(),
+                    function: x,
+                })
+                .collect(),
+            */
             temperature: self.temperature,
             max_output_tokens: self.max_output_tokens,
         };
@@ -174,35 +191,54 @@ impl OpenaiClient {
         }
 
         for _ in 0..MAX_MCP_LOOP {
-            let response = self.request(messages, mcp_registry).await?;
+            let response = match self.request(messages, mcp_registry).await {
+                Ok(r) => r,
+                Err(e) => {
+                    error!("OpenAI request failed: {}", e);
+                    continue;
+                }
+            };
 
-            let choice = response
-                .choices
-                .first()
-                .ok_or(Error::msg("No choice returned"))?;
+            let choice = match response.choices.first() {
+                Some(c) => c,
+                None => {
+                    error!("No choice returned from OpenAI");
+                    continue;
+                }
+            };
 
-            // 如果模型调用了 MCP
             if let ChatRole::Function = choice.message.role {
-                let func_name = choice
-                    .message
-                    .name
-                    .clone()
-                    .ok_or(Error::msg("Function call missing name"))?;
-                let args: Value = serde_json::from_str(&choice.message.content)?;
-                let result = mcp_registry
-                    .registry
-                    .get(&func_name)
-                    .ok_or(Error::msg(format!("MCP {} not found", func_name)))?
-                    .execute(args);
+                let func_name = match &choice.message.name {
+                    Some(n) => n.clone(),
+                    None => {
+                        error!("Function call missing name");
+                        continue;
+                    }
+                };
 
-                // 将 MCP 执行结果插入对话
+                let args: Value = match serde_json::from_str(&choice.message.content) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("Failed to parse function args: {}", e);
+                        continue;
+                    }
+                };
+
+                let result = match mcp_registry.registry.get(&func_name) {
+                    Some(f) => f.execute(args),
+                    None => {
+                        error!("MCP {} not found", func_name);
+                        continue;
+                    }
+                };
+
                 messages.push(Message {
                     role: ChatRole::Function,
                     content: serde_json::to_string(&result)?,
                     name: Some(func_name),
                 });
 
-                continue; // 再次请求模型
+                continue;
             }
 
             // 模型不再调用 MCP，直接返回 Assistant 消息
