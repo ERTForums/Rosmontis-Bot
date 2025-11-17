@@ -103,6 +103,8 @@ async fn main() {
                     if commands.handle(text, &event.original_json, &mut user, &mut |x: KoviMsg| {
                         event.reply(x)
                     }) {
+                        // 保存用户数据
+                        user_manager.save_user(&user).await?;
                         return Ok(());
                     }
 
@@ -126,9 +128,9 @@ async fn main() {
 
                     // 保存用户数据
                     user_manager.save_user(&user).await?;
+                    Ok::<(), Error>(())
 
                     // Event 结束
-                    Ok::<(), Error>(())
                 }
             }
         }
