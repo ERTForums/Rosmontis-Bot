@@ -1,8 +1,8 @@
-use crate::user_manager::User;
-use kovi::Message as KoviMsg;
+pub use crate::user_manager::User;
 use kovi::log::info;
-use serde_json::Value;
+pub use kovi::{Message as KoviMsg, MsgEvent};
 use std::collections::HashMap;
+pub use std::sync::Arc;
 
 /// 命令 Trait
 pub trait Command: Send + Sync {
@@ -15,11 +15,10 @@ pub trait Command: Send + Sync {
     /// 执行命令，如果命令匹配返回 true
     fn execute(
         &self,
-        msg: &str,
-        raw_msg: &Value,
+        text: &str,
+        msg: &Arc<MsgEvent>,
         user: &mut User,
         registry: &CommandRegistry,
-        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool;
 }
 
@@ -42,15 +41,9 @@ impl CommandRegistry {
     }
 
     /// 处理消息，返回 true 表示命令已处理，不再 AI 回复
-    pub fn handle(
-        &self,
-        msg: &str,
-        raw_msg: &Value,
-        user: &mut User,
-        reply: &mut dyn FnMut(KoviMsg),
-    ) -> bool {
+    pub fn handle(&self, text: &str, msg: &Arc<MsgEvent>, user: &mut User) -> bool {
         for cmd in self.commands.values() {
-            if cmd.execute(msg, raw_msg, user, self, reply) {
+            if cmd.execute(text, msg, user, self) {
                 return true;
             }
         }
@@ -82,20 +75,19 @@ impl Command for HelpCommand {
 
     fn execute(
         &self,
-        msg: &str,
-        _raw: &Value,
+        text: &str,
+        msg: &Arc<MsgEvent>,
         _user: &mut User,
         registry: &CommandRegistry,
-        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool {
-        if msg.trim() == "help" {
+        if text.trim() == "help" {
             let commands = registry.list_commands();
             let mut output = String::from("可用命令:\n");
             for (name, desc) in commands {
                 output.push_str(&format!("{}: {}\n", name, desc));
             }
-            let msg = KoviMsg::from(&output);
-            reply(msg);
+            let reply = KoviMsg::from(&output);
+            msg.reply(reply);
             true
         } else {
             false
@@ -116,17 +108,16 @@ impl Command for ClearCommand {
 
     fn execute(
         &self,
-        msg: &str,
-        _raw: &Value,
+        text: &str,
+        msg: &Arc<MsgEvent>,
         user: &mut User,
         _registry: &CommandRegistry,
-        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool {
-        if msg.trim() == "clear" {
+        if text.trim() == "clear" {
             user.history.clear();
             info!("User {} cleared history", user.id);
-            let msg = KoviMsg::from("历史记录已清理");
-            reply(msg);
+            let reply = KoviMsg::from("历史记录已清理");
+            msg.reply(reply);
             true
         } else {
             false

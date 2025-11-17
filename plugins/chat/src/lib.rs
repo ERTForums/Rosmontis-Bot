@@ -81,6 +81,12 @@ async fn main() {
                 let commands = Arc::clone(&commands_clone);
 
                 async move {
+                    // 获取消息文本
+                    let text = match event.borrow_text() {
+                        Some(t) => t,
+                        None => return Ok(()),
+                    };
+
                     // 判断是否群聊被 At，私聊不需要 At
                     if event.is_group()
                         && !OneBotMessage::from_json(&event.original_json)
@@ -90,19 +96,11 @@ async fn main() {
                         return Ok(());
                     }
 
-                    // 获取消息文本
-                    let text = match event.borrow_text() {
-                        Some(t) => t,
-                        None => return Ok(()),
-                    };
-
                     // 打开数据库
                     let mut user = user_manager.load_user(event.sender.user_id).await?;
 
                     // 处理指令
-                    if commands.handle(text, &event.original_json, &mut user, &mut |x: KoviMsg| {
-                        event.reply(x)
-                    }) {
+                    if commands.handle(text, &event, &mut user) {
                         // 保存用户数据
                         user_manager.save_user(&user).await?;
                         return Ok(());

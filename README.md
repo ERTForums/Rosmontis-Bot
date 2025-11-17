@@ -180,7 +180,6 @@ max_output_token = 100
 
 ```
 use crate::commands::*;
-use kovi::Message as KoviMsg;
 
 /// 创建命令结构体
 pub struct ClearCommand;
@@ -198,22 +197,20 @@ impl Command for ClearCommand {
     fn execute(
         &self,
         /// 文本信息
-        msg: &str,
-        /// 原始的onebot消息，已处理成json格式
-        _raw: &Value,
+        text: &str,
+        /// 原始的 MsgEvent
+        msg: &Arc<MsgEvent>
         /// 用户信息，目前包含 ID 和与 AI 的聊天记录
         user: &mut User,
         /// 命令注册器，用于查看或调用其他命令
         _registry: &CommandRegistry,
-        /// reply() 函数用于回复信息
-        reply: &mut dyn FnMut(KoviMsg),
     ) -> bool {
         // 匹配命令则返回 true (返回为 true 时不进行 AI 回复)
-        if msg.trim() == "clear" {
+        if text.trim() == "clear" {
             user.history.clear();
             info!("User {} cleared history", user.id);
-            let msg = KoviMsg::from("历史记录已清理");
-            reply(msg);
+            let reply = KoviMsg::from("历史记录已清理");
+            msg.reply(reply);
             true
         } else {
             false
