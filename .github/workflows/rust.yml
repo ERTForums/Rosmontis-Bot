@@ -44,6 +44,6 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: PacMine-${{ runner.os }}
+          name: RosmontisBot-${{ runner.os }}
           path: |
             target/release/ros-bot${{ runner.os == 'Windows' && '.exe' || '' }}
