@@ -196,13 +196,13 @@ impl Command for ClearCommand {
     /// 执行命令
     fn execute(
         &self,
-        /// 文本信息
+        // 文本信息
         text: &str,
-        /// 原始的 MsgEvent
-        msg: &Arc<MsgEvent>
-        /// 用户信息，目前包含 ID 和与 AI 的聊天记录
+        // 原始的 MsgEvent
+        msg: &Arc<MsgEvent>,
+        // 用户信息，目前包含 ID 和与 AI 的聊天记录
         user: &mut User,
-        /// 命令注册器，用于查看或调用其他命令
+        // 命令注册器，用于查看或调用其他命令
         _registry: &CommandRegistry,
     ) -> bool {
         // 匹配命令则返回 true (返回为 true 时不进行 AI 回复)
