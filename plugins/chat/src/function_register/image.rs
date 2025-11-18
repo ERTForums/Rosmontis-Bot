@@ -1,5 +1,7 @@
 use crate::commands::*;
-use anyhow::{Error, anyhow};
+use anyhow::{anyhow, Error};
+use base64::engine::general_purpose;
+use base64::Engine;
 use kovi::log::{error, info};
 use rand::rng;
 use rand::seq::IndexedRandom;
@@ -43,7 +45,7 @@ impl Command for ImageCommand {
             }
 
             // 抽取图片
-            let image = match random_file_in_dir(data_dir) {
+            let image = match random_file_base64(&data_dir) {
                 Ok(v) => v,
                 Err(e) => {
                     error!("Failed to get image: {}", e);
@@ -53,7 +55,7 @@ impl Command for ImageCommand {
 
             let reply = KoviMsg::new()
                 .add_reply(msg.message_id)
-                .add_image(format!("file://{}", image.display()).as_str());
+                .add_image(format!("base64://{}", image).as_str());
             msg.reply(reply);
 
             true
@@ -63,21 +65,28 @@ impl Command for ImageCommand {
     }
 }
 
-fn random_file_in_dir(dir: PathBuf) -> Result<PathBuf, Error> {
+pub fn random_file_base64(dir: &PathBuf) -> Result<String, Error> {
+    // 读取目录
     let mut files = Vec::new();
-
-    for entry in fs::read_dir(&dir)? {
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-
         if path.is_file() {
             files.push(path);
         }
     }
 
+    // 随机抽一个
     let mut rng = rng();
-    files
+    let file = files
         .choose(&mut rng)
-        .cloned()
-        .ok_or_else(|| anyhow!("no files found in directory: {:?}", dir))
+        .ok_or_else(|| anyhow!("no files in dir: {:?}", dir))?;
+
+    // 读取内容
+    let bytes = fs::read(file)?;
+
+    // 编码 base64
+    let encoded = general_purpose::STANDARD.encode(bytes);
+
+    Ok(encoded)
 }

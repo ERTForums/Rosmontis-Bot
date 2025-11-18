@@ -15,7 +15,7 @@ use crate::openai_api::{ChatRole, Message as OpenaiMsg, OpenaiClient};
 use crate::user_manager::UserManager;
 use anyhow::Error;
 use kovi::log::{error, info};
-use kovi::{PluginBuilder as plugin, PluginBuilder};
+use kovi::{Message, PluginBuilder as plugin, PluginBuilder};
 use std::sync::Arc;
 
 #[kovi::plugin]
@@ -120,7 +120,12 @@ async fn main() {
                     match client.chat(&mut user.history, mcp_loader.as_ref()).await {
                         Ok(reply) => {
                             info!("Reply {} : {}", user.id, reply);
-                            event.reply(reply);
+                            if event.is_group() {
+                                let reply = Message::from(reply).add_reply(event.message_id);
+                                event.reply(reply)
+                            } else {
+                                event.reply(reply)
+                            };
                         }
                         Err(e) => {
                             error!("An error occurred: {:?}", e);
