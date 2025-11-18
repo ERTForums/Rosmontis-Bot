@@ -25,6 +25,7 @@ impl Command for StatusCommand {
         user: &mut User,
         // 命令注册器，用于查看或调用其他命令
         _registry: &CommandRegistry,
+        _data_dir: PathBuf,
     ) -> bool {
         // 匹配命令则返回 true (返回为 true 时不进行 AI 回复)
         if text.trim() == "status" {

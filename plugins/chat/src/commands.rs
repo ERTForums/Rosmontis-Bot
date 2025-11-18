@@ -1,7 +1,8 @@
 pub use crate::user_manager::User;
-use kovi::log::info;
+pub use kovi::log::info;
 pub use kovi::{Message as KoviMsg, MsgEvent};
 use std::collections::HashMap;
+pub use std::path::PathBuf;
 pub use std::sync::Arc;
 
 /// 命令 Trait
@@ -19,6 +20,7 @@ pub trait Command: Send + Sync {
         msg: &Arc<MsgEvent>,
         user: &mut User,
         registry: &CommandRegistry,
+        data_dir: PathBuf,
     ) -> bool;
 }
 
@@ -41,9 +43,21 @@ impl CommandRegistry {
     }
 
     /// 处理消息，返回 true 表示命令已处理，不再 AI 回复
-    pub fn handle(&self, text: &str, msg: &Arc<MsgEvent>, user: &mut User) -> bool {
+    pub fn handle(
+        &self,
+        text: &str,
+        msg: &Arc<MsgEvent>,
+        user: &mut User,
+        data_dir: &PathBuf,
+    ) -> bool {
         for cmd in self.commands.values() {
-            if cmd.execute(text, msg, user, self) {
+            if cmd.execute(
+                text,
+                msg,
+                user,
+                self,
+                data_dir.join(cmd.name().replace('/', "_").replace('\0', "")),
+            ) {
                 return true;
             }
         }
@@ -79,6 +93,7 @@ impl Command for HelpCommand {
         msg: &Arc<MsgEvent>,
         _user: &mut User,
         registry: &CommandRegistry,
+        _data_dir: PathBuf,
     ) -> bool {
         if text.trim() == "help" {
             let commands = registry.list_commands();
@@ -112,6 +127,7 @@ impl Command for ClearCommand {
         msg: &Arc<MsgEvent>,
         user: &mut User,
         _registry: &CommandRegistry,
+        _data_dir: PathBuf,
     ) -> bool {
         if text.trim() == "clear" {
             user.history.clear();

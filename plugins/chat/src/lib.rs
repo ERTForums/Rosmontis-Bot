@@ -15,7 +15,7 @@ use crate::openai_api::{ChatRole, Message as OpenaiMsg, OpenaiClient};
 use crate::user_manager::UserManager;
 use anyhow::Error;
 use kovi::log::{error, info};
-use kovi::{Message as KoviMsg, PluginBuilder as plugin, PluginBuilder};
+use kovi::{PluginBuilder as plugin, PluginBuilder};
 use std::sync::Arc;
 
 #[kovi::plugin]
@@ -67,11 +67,13 @@ async fn main() {
     info!("MCP functions loaded");
 
     // 回应消息
+    let data_path_arc = Arc::new(data_path);
     plugin::on_msg({
         let user_manager_clone = Arc::clone(&user_manager);
         let client_clone = Arc::clone(&client);
         let mcp_loader_clone = Arc::clone(&mcp_loader);
         let commands_clone = Arc::clone(&commands);
+        let data_path_clone = Arc::clone(&data_path_arc);
 
         move |event| {
             {
@@ -79,6 +81,7 @@ async fn main() {
                 let client = Arc::clone(&client_clone);
                 let mcp_loader = Arc::clone(&mcp_loader_clone);
                 let commands = Arc::clone(&commands_clone);
+                let data_path = Arc::clone(&data_path_clone);
 
                 async move {
                     // 获取消息文本
@@ -100,7 +103,7 @@ async fn main() {
                     let mut user = user_manager.load_user(event.sender.user_id).await?;
 
                     // 处理指令
-                    if commands.handle(text, &event, &mut user) {
+                    if commands.handle(text, &event, &mut user, &*data_path) {
                         // 保存用户数据
                         user_manager.save_user(&user).await?;
                         return Ok(());

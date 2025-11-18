@@ -1,3 +1,4 @@
+mod image;
 mod status;
 
 pub use crate::commands::CommandRegistry;
@@ -10,6 +11,8 @@ pub fn register_commands(commands_reg: &mut CommandRegistry) {
 
     use status::StatusCommand;
     commands_reg.register(StatusCommand);
+    use image::ImageCommand;
+    commands_reg.register(ImageCommand);
 }
 
 /// 在此注册 MCP

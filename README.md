@@ -204,6 +204,8 @@ impl Command for ClearCommand {
         user: &mut User,
         // 命令注册器，用于查看或调用其他命令
         _registry: &CommandRegistry,
+        // 数据目录，此命令的专属储存目录，不会默认创建
+        _data_dir: PathBuf,
     ) -> bool {
         // 匹配命令则返回 true (返回为 true 时不进行 AI 回复)
         if text.trim() == "clear" {
