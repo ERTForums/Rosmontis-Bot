@@ -6,12 +6,14 @@ mod message;
 mod openai_api;
 mod user_manager;
 
-use crate::commands::CommandRegistry;
+use crate::commands::{CommandRegistry, KoviMsg};
 use crate::config::Config;
 use crate::function_register::{register_commands, register_mcp};
 use crate::mcp_loader::MCPRegistry;
 use crate::message::OneBotMessage;
-use crate::openai_api::{ChatRole, Message as OpenaiMsg, OpenaiClient};
+use crate::openai_api::{
+    ChatRole, ContentPart, Message as OpenaiMsg, MessageContent, OpenaiClient,
+};
 use crate::user_manager::UserManager;
 use anyhow::Error;
 use kovi::log::{error, info};
@@ -84,23 +86,29 @@ async fn main() {
                 let data_path = Arc::clone(&data_path_clone);
 
                 async move {
-                    // 获取消息文本
-                    let text = match event.borrow_text() {
-                        Some(t) => t,
-                        None => return Ok(()),
-                    };
+                    let origin_json = OneBotMessage::from_json(&event.original_json)
+                        .expect("Failed to parse message");
+                    let images = origin_json.find_image();
 
                     // 判断是否群聊被 At，私聊不需要 At
-                    if event.is_group()
-                        && !OneBotMessage::from_json(&event.original_json)
-                            .expect("Failed to parse message")
-                            .is_at(event.self_id)
-                    {
+                    if event.is_group() && !origin_json.is_at(event.self_id) {
                         return Ok(());
                     }
 
                     // 打开数据库
                     let mut user = user_manager.load_user(event.sender.user_id).await?;
+
+                    // 获取消息文本
+                    let text = match event.borrow_text() {
+                        Some(t) => t,
+                        None => {
+                            if images.is_empty() {
+                                return Ok(());
+                            } else {
+                                ""
+                            }
+                        }
+                    };
 
                     // 处理指令
                     if commands.handle(text, &event, &mut user, &*data_path) {
@@ -110,16 +118,43 @@ async fn main() {
                     }
 
                     // 构造消息列表
-                    user.history.push(OpenaiMsg {
-                        role: ChatRole::User,
-                        content: text.to_string(),
-                        name: None,
-                    });
+                    if images.is_empty() {
+                        user.history.push(OpenaiMsg {
+                            role: ChatRole::User,
+                            content: MessageContent::Text(text.to_string()),
+                            name: None,
+                        })
+                    } else {
+                        let mut multi: Vec<ContentPart> = vec![ContentPart {
+                            kind: "text".to_string(),
+                            text: Some(text.to_string()),
+                            image_url: None,
+                        }];
+                        for i in images {
+                            multi.push(ContentPart {
+                                kind: "image_url".to_string(),
+                                text: None,
+                                image_url: Some(i),
+                            })
+                        }
+                        user.history.push(OpenaiMsg {
+                            role: ChatRole::User,
+                            content: MessageContent::Multi(multi),
+                            name: None,
+                        })
+                    }
 
                     // AI 回复
                     match client.chat(&mut user.history, mcp_loader.as_ref()).await {
                         Ok(reply) => {
-                            info!("Reply {} : {}", user.id, reply);
+                            info!("Reply {} : {:?}", user.id, reply);
+                            let reply = match reply {
+                                MessageContent::Text(v) => KoviMsg::from(v),
+                                MessageContent::Multi(v) => {
+                                    // 为什么会返回图片？？？
+                                    KoviMsg::from_value(serde_json::to_value(v).unwrap()).unwrap()
+                                }
+                            };
                             if event.is_group() {
                                 let reply = Message::from(reply).add_reply(event.message_id);
                                 event.reply(reply)

@@ -17,6 +17,7 @@ struct OneBotMessageBody {
 #[derive(Deserialize)]
 struct OneBotMessageData {
     qq: Option<String>,
+    url: Option<String>,
 }
 
 impl OneBotMessage {
@@ -39,5 +40,16 @@ impl OneBotMessage {
         } else {
             false
         }
+    }
+
+    /// 检查是否包含图片，返回 URL 列表
+    pub fn find_image(&self) -> Vec<String> {
+        let mut image_url = vec![];
+        for i in &self.message {
+            if i.msg_type == "image" {
+                image_url.push(i.data.url.clone().expect("Failed to get url of image"))
+            }
+        }
+        image_url
     }
 }

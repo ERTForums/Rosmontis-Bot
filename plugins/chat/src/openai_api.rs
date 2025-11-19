@@ -1,9 +1,8 @@
-use crate::mcp_loader::{FunctionCall, FunctionDef, MCPRegistry};
-use anyhow::Error;
+use crate::mcp_loader::{FunctionDef, MCPRegistry};
+use anyhow::{Error, anyhow};
 use kovi::log::error;
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -59,10 +58,29 @@ pub struct Usage {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Message {
     pub role: ChatRole,
-    pub content: String,
+    pub content: MessageContent,
     /// MCP Function 名称
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    Text(String),
+    Multi(Vec<ContentPart>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentPart {
+    #[serde(rename = "type")]
+    pub kind: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -174,7 +192,7 @@ impl OpenaiClient {
         &self,
         messages: &mut Vec<Message>,
         mcp_registry: &MCPRegistry,
-    ) -> Result<String, Error> {
+    ) -> Result<MessageContent, Error> {
         // 插入系统提示词
         if messages
             .first()
@@ -184,12 +202,45 @@ impl OpenaiClient {
                 0,
                 Message {
                     role: ChatRole::System,
-                    content: self.system_promote.clone(),
+                    content: MessageContent::Text(self.system_promote.clone()),
                     name: None,
                 },
             );
         }
 
+        let response = match self.request(messages, mcp_registry).await {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(anyhow!("OpenAI request failed: {}", e));
+            }
+        };
+
+        let choice = match response.choices.first() {
+            Some(c) => c,
+            None => {
+                return Err(Error::msg("No choice returned from OpenAI"));
+            }
+        };
+
+        let content = choice.message.content.clone();
+
+        // 把 "\\n" 转换成真实换行
+        // let content = content.replace("\\n", "\n");
+        let content = match content {
+            MessageContent::Text(v) => MessageContent::Text(v.replace("\\n", "\n")),
+            MessageContent::Multi(v) => MessageContent::Multi(v),
+        };
+
+        messages.push(Message {
+            role: ChatRole::Assistant,
+            content: content.clone(),
+            name: None,
+        });
+
+        Ok(content)
+
+        // 弃用的 MCP 循环
+        /*
         for _ in 0..MAX_MCP_LOOP {
             let response = match self.request(messages, mcp_registry).await {
                 Ok(r) => r,
@@ -257,5 +308,6 @@ impl OpenaiClient {
         }
 
         Err(Error::msg("Max MCP loops reached"))
+         */
     }
 }
