@@ -1,5 +1,5 @@
 use crate::mcp_loader::MCPRegistry;
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use kovi::log::error;
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
