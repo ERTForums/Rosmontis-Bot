@@ -17,7 +17,8 @@ use crate::openai_api::{
 use crate::user_manager::UserManager;
 use anyhow::Error;
 use kovi::log::{error, info};
-use kovi::{Message, MsgEvent, PluginBuilder as plugin, PluginBuilder};
+use kovi::{Message, MsgEvent, NoticeEvent, PluginBuilder as plugin, PluginBuilder, RuntimeBot};
+use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -69,11 +70,12 @@ async fn main() {
     let mcp_loader = Arc::new(mcp_loader);
     info!("MCP functions loaded");
 
+    // 回应戳一戳
     plugin::on_notice({
-        move |event| async move {
-            println!("{}", event.original_json);
-            event
-        }
+        let user_manager = Arc::clone(&user_manager);
+        let client = Arc::clone(&client);
+        let bot = Arc::clone(&bot);
+        move |event| notice_handler(event, user_manager.clone(), client.clone(), bot.clone())
     });
 
     // 回应消息
@@ -118,9 +120,6 @@ async fn msg_handler(
         return Ok(());
     }
 
-    // 打开数据库
-    let mut user = user_manager.load_user(event.sender.user_id).await?;
-
     // 获取消息文本
     let text = match event.borrow_text() {
         Some(t) => t,
@@ -132,6 +131,9 @@ async fn msg_handler(
             }
         }
     };
+
+    // 打开数据库
+    let mut user = user_manager.load_user(event.sender.user_id).await?;
 
     // 处理指令
     if commands.handle(text, &event, &mut user, &*data_path) {
@@ -186,6 +188,58 @@ async fn msg_handler(
         Err(e) => {
             error!("An error occurred: {:?}", e);
         }
+    }
+
+    // 保存用户数据
+    user_manager.save_user(&user).await?;
+
+    Ok(())
+}
+
+async fn notice_handler(
+    event: Arc<NoticeEvent>,
+    user_manager: Arc<UserManager>,
+    client: Arc<OpenaiClient>,
+    bot: Arc<RuntimeBot>,
+) -> Result<(), Error> {
+    #[derive(Deserialize)]
+    struct Notice {
+        group_id: Option<i64>,
+        sender_id: i64,
+        sub_type: String,
+        target_id: i64,
+    }
+    let notice = serde_json::from_value::<Notice>(event.original_json.clone())?;
+    if notice.sub_type != "poke" || notice.target_id != event.self_id {
+        return Ok(());
+    }
+
+    info!("User {} send a poke", notice.sender_id);
+
+    // 打开数据库
+    let mut user = user_manager.load_user(notice.sender_id).await?;
+
+    // 构造消息列表
+    user.history.push(OpenaiMsg {
+        role: ChatRole::User,
+        // 暂时仅支持默认文本
+        content: MessageContent::Text("(戳一戳)".to_string()),
+    });
+
+    // 获取 AI 回复
+    let reply = client.chat(&mut user.history, &MCPRegistry::new()).await?;
+    // 仅处理文本回复
+    let reply = KoviMsg::from(if let MessageContent::Text(v) = reply {
+        v
+    } else {
+        return Err(Error::msg("Reply contain Multi"));
+    });
+
+    info!("Reply {} : {:?}", user.id, reply);
+    if let Some(group) = notice.group_id {
+        bot.send_group_msg(group, reply)
+    } else {
+        bot.send_private_msg(notice.sender_id, reply)
     }
 
     // 保存用户数据
