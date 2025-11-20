@@ -1,67 +1,35 @@
-use crate::mcp_loader::{FunctionDef, MCPRegistry};
-use anyhow::{Error, anyhow};
+use crate::mcp_loader::MCPRegistry;
+use anyhow::{anyhow, Error};
 use kovi::log::error;
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// 最大 MCP 循环次数
-const MAX_MCP_LOOP: u8 = 5;
-
 #[derive(Debug, Serialize)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<Message>,
-    // MCP functions
-    // pub functions: Vec<FunctionDef>,
-    // MCP function_call
-    // pub function_call: String,
-    // OpenRouter MCP
-    // pub tools: Vec<OpenRouterTool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
 }
 
-#[derive(Debug, Serialize)]
-struct OpenRouterTool {
-    tool_type: String,
-    function: FunctionDef,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ChatResponse {
-    pub id: String,
-    pub object: String,
-    pub created: u64,
-    pub model: String,
     pub choices: Vec<ChatChoice>,
-    pub usage: Option<Usage>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ChatChoice {
-    pub index: u32,
     pub message: Message,
-    pub finish_reason: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Usage {
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-    pub total_tokens: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Message {
     pub role: ChatRole,
     pub content: MessageContent,
-    /// MCP Function 名称
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,17 +116,6 @@ impl OpenaiClient {
         let request = ChatRequest {
             model: self.model.clone(),
             messages: messages.clone(),
-            // functions: mcp_registry.functions(),
-            // function_call: "auto".to_string(),
-            /* tools: mcp_registry
-                .functions()
-                .into_iter()
-                .map(|x| OpenRouterTool {
-                    tool_type: "function".to_string(),
-                    function: x,
-                })
-                .collect(),
-            */
             temperature: self.temperature,
             max_output_tokens: self.max_output_tokens,
         };
@@ -203,7 +160,6 @@ impl OpenaiClient {
                 Message {
                     role: ChatRole::System,
                     content: MessageContent::Text(self.system_promote.clone()),
-                    name: None,
                 },
             );
         }
@@ -234,80 +190,8 @@ impl OpenaiClient {
         messages.push(Message {
             role: ChatRole::Assistant,
             content: content.clone(),
-            name: None,
         });
 
         Ok(content)
-
-        // 弃用的 MCP 循环
-        /*
-        for _ in 0..MAX_MCP_LOOP {
-            let response = match self.request(messages, mcp_registry).await {
-                Ok(r) => r,
-                Err(e) => {
-                    error!("OpenAI request failed: {}", e);
-                    continue;
-                }
-            };
-
-            let choice = match response.choices.first() {
-                Some(c) => c,
-                None => {
-                    error!("No choice returned from OpenAI");
-                    continue;
-                }
-            };
-
-            if let ChatRole::Function = choice.message.role {
-                let func_name = match &choice.message.name {
-                    Some(n) => n.clone(),
-                    None => {
-                        error!("Function call missing name");
-                        continue;
-                    }
-                };
-
-                let args: Value = match serde_json::from_str(&choice.message.content) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!("Failed to parse function args: {}", e);
-                        continue;
-                    }
-                };
-
-                let result = match mcp_registry.registry.get(&func_name) {
-                    Some(f) => f.execute(args),
-                    None => {
-                        error!("MCP {} not found", func_name);
-                        continue;
-                    }
-                };
-
-                messages.push(Message {
-                    role: ChatRole::Function,
-                    content: serde_json::to_string(&result)?,
-                    name: Some(func_name),
-                });
-
-                continue;
-            }
-
-            // 模型不再调用 MCP，直接返回 Assistant 消息
-            let content = choice.message.content.clone();
-
-            // 把 "\\n" 转换成真实换行
-            let content = content.replace("\\n", "\n");
-
-            messages.push(Message {
-                role: ChatRole::Assistant,
-                content: content.clone(),
-                name: None,
-            });
-
-            return Ok(content);
-        }
-
-        Err(Error::msg("Max MCP loops reached"))
-         */
     }
 }
