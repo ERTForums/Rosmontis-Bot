@@ -205,7 +205,7 @@ async fn notice_handler(
     #[derive(Deserialize)]
     struct Notice {
         group_id: Option<i64>,
-        sender_id: i64,
+        user_id: i64,
         sub_type: String,
         target_id: i64,
     }
@@ -214,10 +214,10 @@ async fn notice_handler(
         return Ok(());
     }
 
-    info!("User {} send a poke", notice.sender_id);
+    info!("User {} send a poke", notice.user_id);
 
     // 打开数据库
-    let mut user = user_manager.load_user(notice.sender_id).await?;
+    let mut user = user_manager.load_user(notice.user_id).await?;
 
     // 构造消息列表
     user.history.push(OpenaiMsg {
@@ -239,7 +239,7 @@ async fn notice_handler(
     if let Some(group) = notice.group_id {
         bot.send_group_msg(group, reply)
     } else {
-        bot.send_private_msg(notice.sender_id, reply)
+        bot.send_private_msg(notice.user_id, reply)
     }
 
     // 保存用户数据
