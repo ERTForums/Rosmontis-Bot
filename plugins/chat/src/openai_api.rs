@@ -1,5 +1,5 @@
 use crate::mcp_loader::MCPRegistry;
-use anyhow::{Error, anyhow};
+use anyhow::{anyhow, Error};
 use kovi::log::error;
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
@@ -84,8 +84,8 @@ impl OpenaiClient {
         let builder = reqwest::Client::builder()
             .pool_max_idle_per_host(20)
             .pool_idle_timeout(Duration::from_secs(90))
-            .timeout(Duration::from_secs(15))
-            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
             .tcp_nodelay(true);
 
         let client = Arc::new(match proxy {

@@ -16,6 +16,7 @@ use crate::openai_api::{
 };
 use crate::user_manager::UserManager;
 use anyhow::Error;
+use base64::Engine;
 use kovi::log::{error, info};
 use kovi::{Message, MsgEvent, NoticeEvent, PluginBuilder as plugin, PluginBuilder, RuntimeBot};
 use serde::Deserialize;
@@ -155,6 +156,38 @@ async fn msg_handler(
             image_url: None,
         }];
         for i in images {
+            // 下载并编码
+            /*
+            // 下载图片
+            let byte_img = reqwest::Client::new()
+                .get(i)
+                .send()
+                .await?
+                .bytes()
+                .await?
+                .to_vec();
+            // 识别图片类型
+            let mime_type = if byte_img.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+                "image/png"
+            } else if byte_img.starts_with(&[0xFF, 0xD8, 0xFF]) {
+                "image/jpeg"
+            } else if byte_img.starts_with(b"GIF8") {
+                "image/gif"
+            } else if byte_img.starts_with(b"RIFF") && byte_img[8..12].eq(b"WEBP") {
+                "image/webp"
+            } else {
+                "application/octet-stream" // 实在认不出来
+            };
+            // Base64
+            let base64_img = base64::engine::general_purpose::STANDARD.encode(byte_img);
+            // 插入图片
+            multi.push(ContentPart {
+                kind: "image_url".to_string(),
+                text: None,
+                image_url: Some(format!("data:{};base64,{}", mime_type, base64_img)),
+            })
+            */
+            // 直接使用 URL
             multi.push(ContentPart {
                 kind: "image_url".to_string(),
                 text: None,
