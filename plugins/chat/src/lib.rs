@@ -212,9 +212,7 @@ async fn msg_handler(
                 }
             };
             if event.is_group() {
-                let reply = Message::from(reply)
-                    .add_reply(event.message_id)
-                    .add_at(user.id.to_string().as_str());
+                let reply = Message::from(reply).add_reply(event.message_id);
                 event.reply(reply)
             } else {
                 event.reply(reply)
