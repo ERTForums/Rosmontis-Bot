@@ -1,10 +1,10 @@
+use crate::config::Config;
 use crate::mcp_loader::MCPRegistry;
+use crate::user_manager::{ChatRole, Message, MessageContent};
 use anyhow::{Error, anyhow};
 use kovi::log::error;
-use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
 
 #[derive(Debug, Serialize)]
 pub struct ChatRequest {
@@ -26,40 +26,6 @@ pub struct ChatChoice {
     pub message: Message,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Message {
-    pub role: ChatRole,
-    pub content: MessageContent,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum MessageContent {
-    Text(String),
-    Multi(Vec<ContentPart>),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContentPart {
-    #[serde(rename = "type")]
-    pub kind: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum ChatRole {
-    System,
-    User,
-    Assistant,
-    Function,
-}
-
 pub struct OpenaiClient {
     api_url: String,
     bearer_token: String,
@@ -68,54 +34,33 @@ pub struct OpenaiClient {
     temperature: Option<f32>,
     max_output_tokens: Option<u32>,
     http_client: Arc<reqwest::Client>,
+    mcp_loader: Arc<Option<MCPRegistry>>,
 }
 
 impl OpenaiClient {
     /// 构建 OpenAI 客户端
     pub async fn build(
-        api: String,
-        token: String,
-        model: String,
-        promote: String,
-        temperature: Option<f32>,
-        max_output_tokens: Option<u32>,
-        proxy: Option<String>,
+        config: Config,
+        http_client: Arc<reqwest::Client>,
+        mcp_loader: Arc<Option<MCPRegistry>>,
     ) -> Self {
-        let builder = reqwest::Client::builder()
-            .pool_max_idle_per_host(20)
-            .pool_idle_timeout(Duration::from_secs(270))
-            .timeout(Duration::from_secs(90))
-            .connect_timeout(Duration::from_secs(30))
-            .tcp_nodelay(true);
-
-        let client = Arc::new(match proxy {
-            None => builder.build().expect("Failed to build reqwest client"),
-            Some(v) => builder
-                .proxy(Proxy::all(v).expect("Failed to connect to proxy"))
-                .build()
-                .expect("Failed to build reqwest client"),
-        });
-
         OpenaiClient {
-            api_url: api,
-            bearer_token: token,
-            model,
-            system_promote: promote,
-            temperature,
-            max_output_tokens,
-            http_client: client,
+            api_url: config.api_url,
+            bearer_token: config.bearer_token,
+            model: config.model,
+            system_promote: config.system_promote,
+            temperature: config.temperature,
+            max_output_tokens: config.max_output_tokens,
+            http_client,
+            mcp_loader,
         }
     }
 
     /// 发送 API 请求
-    async fn request(
-        &self,
-        messages: &Vec<Message>,
-        _mcp_registry: &MCPRegistry,
-    ) -> Result<ChatResponse, Error> {
+    async fn request(&self, messages: &[Message]) -> Result<ChatResponse, Error> {
         let request = ChatRequest {
             model: self.model.clone(),
-            messages: messages.clone(),
+            messages: messages.to_vec(),
             temperature: self.temperature,
             max_output_tokens: self.max_output_tokens,
         };
@@ -145,11 +90,7 @@ impl OpenaiClient {
     }
 
     /// 使用 API 进行聊天
-    pub async fn chat(
-        &self,
-        messages: &mut Vec<Message>,
-        mcp_registry: &MCPRegistry,
-    ) -> Result<MessageContent, Error> {
+    pub async fn chat(&self, messages: &mut Vec<Message>) -> Result<MessageContent, Error> {
         // 插入系统提示词
         if messages
             .first()
@@ -164,13 +105,18 @@ impl OpenaiClient {
             );
         }
 
-        let response = match self.request(messages, mcp_registry).await {
+        // MCP (未实现)
+        let _ = self.mcp_loader;
+
+        // 发送请求
+        let response = match self.request(messages).await {
             Ok(r) => r,
             Err(e) => {
                 return Err(anyhow!("OpenAI request failed: {}", e));
             }
         };
 
+        // 检查 choice
         let choice = match response.choices.first() {
             Some(c) => c,
             None => {
@@ -187,6 +133,7 @@ impl OpenaiClient {
             MessageContent::Multi(v) => MessageContent::Multi(v),
         };
 
+        // 插入历史记录
         messages.push(Message {
             role: ChatRole::Assistant,
             content: content.clone(),

@@ -11,17 +11,17 @@ use crate::config::Config;
 use crate::function_register::{register_commands, register_mcp};
 use crate::mcp_loader::MCPRegistry;
 use crate::message::OneBotMessage;
-use crate::openai_api::{
-    ChatRole, ContentPart, Message as OpenaiMsg, MessageContent, OpenaiClient,
-};
+use crate::openai_api::OpenaiClient;
 use crate::user_manager::UserManager;
+use crate::user_manager::{ChatRole, ContentPart, Message as OpenaiMsg, MessageContent};
 use anyhow::Error;
-use base64::Engine;
 use kovi::log::{error, info};
 use kovi::{Message, MsgEvent, NoticeEvent, PluginBuilder as plugin, PluginBuilder, RuntimeBot};
+use reqwest::Proxy;
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[kovi::plugin]
 async fn main() {
@@ -31,21 +31,6 @@ async fn main() {
 
     // 读取配置文件
     let config = Config::from_file(data_path.join("config.toml"));
-
-    // 创建 OpenAI 客户端
-    let client = Arc::new(
-        OpenaiClient::build(
-            config.api_url,
-            config.bearer_token,
-            config.model,
-            config.system_promote,
-            config.temperature,
-            config.max_output_tokens,
-            config.proxy,
-        )
-        .await,
-    );
-    info!("OpenAI Client loaded");
 
     // 打开用户管理器
     let user_manager = match UserManager::open(data_path.join("users.db")).await {
@@ -59,6 +44,21 @@ async fn main() {
         }
     };
 
+    // 构建 HTTP 客户端
+    let builder = reqwest::Client::builder()
+        .pool_max_idle_per_host(20)
+        .pool_idle_timeout(Duration::from_secs(270))
+        .timeout(Duration::from_secs(90))
+        .connect_timeout(Duration::from_secs(30))
+        .tcp_nodelay(true);
+    let http_client = Arc::new(match &config.proxy {
+        None => builder.build().expect("Failed to build reqwest client"),
+        Some(v) => builder
+            .proxy(Proxy::all(v).expect("Failed to connect to proxy"))
+            .build()
+            .expect("Failed to build reqwest client"),
+    });
+
     // 注册命令
     let mut commands = CommandRegistry::default();
     register_commands(&mut commands);
@@ -68,8 +68,12 @@ async fn main() {
     // 创建 MCP 加载器
     let mut mcp_loader = MCPRegistry::new();
     register_mcp(&mut mcp_loader);
-    let mcp_loader = Arc::new(mcp_loader);
+    let mcp_loader = Arc::new(Some(mcp_loader));
     info!("MCP functions loaded");
+
+    // 创建 OpenAI 客户端
+    let client = Arc::new(OpenaiClient::build(config, http_client, mcp_loader).await);
+    info!("OpenAI Client loaded");
 
     // 回应戳一戳
     plugin::on_notice({
@@ -85,7 +89,6 @@ async fn main() {
         // 第一次 clone
         let user_manager = Arc::clone(&user_manager);
         let client = Arc::clone(&client);
-        let mcp_loader = Arc::clone(&mcp_loader);
         let commands = Arc::clone(&commands);
         let data_path = Arc::clone(&data_path_arc);
 
@@ -96,7 +99,6 @@ async fn main() {
                 event,
                 user_manager.clone(),
                 client.clone(),
-                mcp_loader.clone(),
                 commands.clone(),
                 data_path.clone(),
             )
@@ -108,7 +110,6 @@ async fn msg_handler(
     event: Arc<MsgEvent>,
     user_manager: Arc<UserManager>,
     client: Arc<OpenaiClient>,
-    mcp_loader: Arc<MCPRegistry>,
     commands: Arc<CommandRegistry>,
     data_path: Arc<PathBuf>,
 ) -> Result<(), Error> {
@@ -200,8 +201,7 @@ async fn msg_handler(
         })
     }
 
-    // AI 回复
-    match client.chat(&mut user.history, mcp_loader.as_ref()).await {
+    match client.chat(&mut user.history).await {
         Ok(reply) => {
             info!("Reply {} : {:?}", user.id, reply);
             let reply = match reply {
@@ -260,7 +260,7 @@ async fn notice_handler(
     });
 
     // 获取 AI 回复
-    let reply = client.chat(&mut user.history, &MCPRegistry::new()).await?;
+    let reply = client.chat(&mut user.history).await?;
     // 仅处理文本回复
     let reply = KoviMsg::from(if let MessageContent::Text(v) = reply {
         v

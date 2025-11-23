@@ -1,16 +1,57 @@
-use crate::openai_api::Message;
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
 use std::path::PathBuf;
 
+/// 消息
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Message {
+    pub role: ChatRole,
+    pub content: MessageContent,
+}
+
+/// 消息类型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    Text(String),
+    Multi(Vec<ContentPart>),
+}
+
+/// 非文本的消息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentPart {
+    #[serde(rename = "type")]
+    pub kind: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+}
+
+/// 角色
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum ChatRole {
+    System,
+    User,
+    Assistant,
+    Function,
+}
+
+/// 用户数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
+    /// 用户 ID
     pub id: i64,
+    /// 用户聊天历史
     pub history: Vec<Message>,
 }
 
+/// 用户管理器
 pub struct UserManager {
     pool: SqlitePool,
 }
