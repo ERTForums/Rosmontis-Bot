@@ -31,7 +31,7 @@ impl Command for SeedreamCommand {
         data_dir: PathBuf,
     ) -> bool {
         // 匹配命令则返回 true (返回为 true 时不进行 AI 回复)
-        if text.trim().starts_with("generate") {
+        if text.trim().starts_with("seedream ") {
             info!("User {} generated image", user.id);
 
             // 尝试从 token.txt 读取 bearer token
@@ -52,7 +52,7 @@ impl Command for SeedreamCommand {
                 .expect("Failed to parse message");
             let images = generate_img(
                 token,
-                text.trim().strip_prefix("generate").unwrap().to_string(),
+                text.trim().strip_prefix("seedream ").unwrap().to_string(),
                 origin_msg.find_image(),
             );
 
@@ -101,9 +101,15 @@ fn generate_img(token: String, text: String, img: Vec<String>) -> Vec<String> {
         .bearer_auth(token)
         .json(&request)
         .send()
-        .expect("Failed to request image generation API");
-    let response = response
-        .json::<Response>()
-        .expect("Failed to parse image generation response");
+        .expect("Failed to request image generation API")
+        .text()
+        .unwrap();
+    let response = match serde_json::from_str::<Response>(&*response) {
+        Ok(v) => v,
+        Err(e) => {
+            error!("Failed to parse image generation response: {e}");
+            panic!("{}", response)
+        }
+    };
     response.data.into_iter().map(|x| x.url).collect()
 }
