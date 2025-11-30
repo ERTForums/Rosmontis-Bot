@@ -57,7 +57,7 @@ impl Command for SeedreamCommand {
             );
 
             // 构造回复
-            let mut reply = KoviMsg::new();
+            let mut reply = KoviMsg::new().add_reply(msg.message_id);
             for i in images {
                 reply.push_image(&*i);
             }
