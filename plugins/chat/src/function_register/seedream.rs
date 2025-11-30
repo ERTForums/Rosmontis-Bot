@@ -70,7 +70,7 @@ impl Command for SeedreamCommand {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct Request {
     model: &'static str,
     prompt: String,
@@ -97,7 +97,7 @@ fn generate_img(token: String, text: String, img: Vec<String>) -> Vec<String> {
         image: if img.is_empty() { None } else { Some(img) },
     };
     let response = client
-        .get(API_URL)
+        .post(API_URL)
         .bearer_auth(token)
         .json(&request)
         .send()
@@ -108,7 +108,7 @@ fn generate_img(token: String, text: String, img: Vec<String>) -> Vec<String> {
         Ok(v) => v,
         Err(e) => {
             error!("Failed to parse image generation response: {e}");
-            panic!("{}", response)
+            panic!("{}\n{}", serde_json::to_string(&request).unwrap(), response)
         }
     };
     response.data.into_iter().map(|x| x.url).collect()
