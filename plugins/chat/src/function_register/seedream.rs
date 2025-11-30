@@ -1,6 +1,7 @@
 use crate::commands::*;
 use kovi::log::{error, info};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 const API_URL: &str = "https://ark.cn-beijing.volces.com/api/v3/images/generations";
 const MODEL: &str = "doubao-seedream-4-0-250828";
@@ -90,7 +91,11 @@ struct ResData {
 
 /// 调用 API 生成图像
 fn generate_img(token: String, text: String, img: Vec<String>) -> Vec<String> {
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(90))
+        .connect_timeout(Duration::from_secs(30))
+        .build()
+        .unwrap();
     let request = Request {
         model: MODEL,
         prompt: text,
