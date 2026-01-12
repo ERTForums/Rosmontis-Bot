@@ -33,13 +33,13 @@ pub struct ContentPart {
 }
 
 /// 角色
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ChatRole {
     System,
     User,
     Assistant,
-    Function,
+    // Function,
 }
 
 /// 用户数据

@@ -12,6 +12,8 @@ pub struct Config {
     pub(crate) system_promote: String,
     pub(crate) temperature: Option<f32>,
     pub(crate) max_output_tokens: Option<u32>,
+    pub(crate) msg_limit: Option<usize>,
+    pub(crate) token_limit: Option<usize>,
 }
 
 impl Config {
@@ -37,6 +39,8 @@ impl Default for Config {
             system_promote: "System Promote".to_string(),
             temperature: None,
             max_output_tokens: None,
+            msg_limit: Some(30),
+            token_limit: Some(5000),
         }
     }
 }
