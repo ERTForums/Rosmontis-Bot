@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::mcp_loader::MCPRegistry;
 use crate::user_manager::{ChatRole, Message, MessageContent};
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use kovi::log::error;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
