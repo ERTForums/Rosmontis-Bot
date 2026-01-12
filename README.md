@@ -68,6 +68,14 @@ system_promote = """
 temperature = 2.0
 # 单次回复最大输出 Token 量
 max_output_token = 100
+
+## 聊天历史同时超出一下两个限制时，只截取最近的消息来请求 AI 回复
+## 至少包含 msg_limit 条消息和 token_limit 个 Token
+## 同时设置且为非零值时才能生效，不包含系统提示词，每条消息都是完整的（不会因为超出 Token 而被截断）
+# 消息条数限制
+msg_limit = 30
+# 消息 Token 限制
+token_limit = 5000
 ```
 
 ### 参考提示词：
