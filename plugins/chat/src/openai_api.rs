@@ -139,7 +139,6 @@ impl OpenaiClient {
         let content = choice.message.content.clone();
 
         // 把 "\\n" 转换成真实换行
-        // let content = content.replace("\\n", "\n");
         let content = match content {
             MessageContent::Text(v) => MessageContent::Text(v.replace("\\n", "\n")),
             MessageContent::Multi(v) => MessageContent::Multi(v),
@@ -164,12 +163,12 @@ fn history_preprocessing(
     let bpe = o200k_base().unwrap();
 
     // 分离系统提示词
-    let history_promote = history.iter().filter(|x| x.role == ChatRole::System);
-    let chat_history = history.iter().filter(|x| x.role != ChatRole::System);
+    let system_promote = history.iter().filter(|x| x.role == ChatRole::System);
+    let chat_promote = history.iter().filter(|x| x.role != ChatRole::System);
 
     let mut token_count: usize = 0;
     let mut msg_count: usize = 0;
-    let processed = chat_history.rev().take_while(|x| {
+    let processed = chat_promote.rev().take_while(|x| {
         token_count += match &x.content {
             MessageContent::Text(v) => bpe.encode_with_special_tokens(&*v).len(),
             _ => 0,
@@ -183,7 +182,7 @@ fn history_preprocessing(
         msg_check || token_check
     });
 
-    let mut history_rev: Vec<Message> = processed.chain(history_promote.rev()).cloned().collect();
+    let mut history_rev: Vec<Message> = processed.chain(system_promote.rev()).cloned().collect();
 
     history_rev.reverse();
     history_rev
