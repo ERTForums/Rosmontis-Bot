@@ -1,5 +1,3 @@
-<img width="435" height="41" alt="图片" src="https://github.com/user-attachments/assets/e5fa3b82-4c1a-4067-a6a9-3064ad11587f" /># Rosmontis-Bot
-
 基于 Kovi 写一个 QQ 机器人 ( ERT 自用机器人)
 
 ## Todo:
