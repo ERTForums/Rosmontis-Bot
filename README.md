@@ -61,7 +61,7 @@ bearer_token = ""
 # 模型名称
 model = ""
 # 提示词
-system_promote = """
+system_prompt = """
 你是一个人工智能助手
 """
 # 温度(温度越低越严谨，越高越灵活)
