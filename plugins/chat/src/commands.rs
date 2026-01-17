@@ -118,7 +118,7 @@ impl Command for ClearCommand {
     }
 
     fn description(&self) -> &'static str {
-        "清空用户历史记录"
+        "清空用户对话记录（此操作不可恢复！）"
     }
 
     fn execute(
