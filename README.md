@@ -61,7 +61,7 @@ bearer_token = ""
 # 模型名称
 model = ""
 # 提示词
-system_promote = """
+system_prompt = """
 你是一个人工智能助手
 """
 # 温度(温度越低越严谨，越高越灵活)
@@ -69,6 +69,7 @@ temperature = 2.0
 # 单次回复最大输出 Token 量
 max_output_token = 100
 
+## 以下为 history trimming 功能，不建议开启，否则可能导致 Token 数减少 API 开销反而增大（破坏缓存）
 ## 聊天历史同时超出一下两个限制时，只截取最近的消息来请求 AI 回复
 ## 至少包含 msg_limit 条消息和 token_limit 个 Token
 ## 同时设置且为非零值时才能生效，不包含系统提示词，每条消息都是完整的（不会因为超出 Token 而被截断）
